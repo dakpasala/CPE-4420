@@ -11,13 +11,16 @@ cv::Mat grayscale(cv::Mat frame) {
     cv::Mat newImage(m, n, CV_8UC1);
 
     for (int i = 0; i < m; i++) {
+        cv::Vec3b* row = frame.ptr<cv::Vec3b>(i);
+        unsigned char* newRow = newImage.ptr<unsigned char>(i);
+
         for (int j = 0; j < n; j++) {
-            cv::Vec3b& pixel = frame.at<cv::Vec3b>(i, j);
+            cv::Vec3b& pixel = row[j];
             unsigned char blue = pixel[0];
             unsigned char green = pixel[1];
             unsigned char red = pixel[2];
 
-            newImage.at<unsigned char>(i, j) = cv::saturate_cast<unsigned char>(0.2126 * red + 0.7152 * green + 0.0722 * blue);
+            newRow[j] = cv::saturate_cast<unsigned char>(0.2126 * red + 0.7152 * green + 0.0722 * blue);
         }
     }
 
@@ -31,24 +34,29 @@ cv::Mat sobel(cv::Mat frame) {
     cv::Mat newImage(m - 2, n - 2, CV_8UC1, cv::Scalar(0));
 
     for (int i = 1; i < m - 1; i++) {
+        uchar* topRow    = frame.ptr<uchar>(i - 1);
+        uchar* middleRow = frame.ptr<uchar>(i);
+        uchar* bottomRow = frame.ptr<uchar>(i + 1);
+        uchar* newRow    = newImage.ptr<uchar>(i - 1);
+
         for (int j = 1; j < n - 1; j++) {
-            int topLeft     = frame.at<uchar>(i - 1, j - 1);
-            int topMiddle   = frame.at<uchar>(i - 1, j);
-            int topRight    = frame.at<uchar>(i - 1, j + 1);
+            int topLeft     = topRow[j - 1];
+            int topMiddle   = topRow[j];
+            int topRight    = topRow[j + 1];
 
-            int middleLeft  = frame.at<uchar>(i, j - 1);
-            int middleRight = frame.at<uchar>(i, j + 1);
+            int middleLeft  = middleRow[j - 1];
+            int middleRight = middleRow[j + 1];
 
-            int bottomLeft   = frame.at<uchar>(i + 1, j - 1);
-            int bottomMiddle = frame.at<uchar>(i + 1, j);
-            int bottomRight  = frame.at<uchar>(i + 1, j + 1);
+            int bottomLeft   = bottomRow[j - 1];
+            int bottomMiddle = bottomRow[j];
+            int bottomRight  = bottomRow[j + 1];
 
             int gx = -topLeft + topRight -2 * middleLeft + 2 * middleRight - bottomLeft + bottomRight;
             int gy = -topLeft - 2 * topMiddle - topRight + bottomLeft + 2 * bottomMiddle + bottomRight;
 
             double magnitude = std::sqrt(gx * gx + gy * gy);
 
-            newImage.at<unsigned char>(i - 1, j - 1) = cv::saturate_cast<uchar>(magnitude);
+            newRow[j - 1] = cv::saturate_cast<uchar>(magnitude);
         }
     }
 
@@ -136,6 +144,8 @@ int main() {
 
     video.release();
     cv::destroyAllWindows();
+
+    // ai generated below
 
     if (frameCount > 0) {
         std::cout << "\nAverage processing times\n"
