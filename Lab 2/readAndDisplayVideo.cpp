@@ -1,14 +1,38 @@
+/************************************************************
+* File: readAndDisplayVideo.cpp
+*
+* Description: Reads a video file frame by frame and applies
+* manual grayscale conversion and Sobel edge detection,
+* comparing execution time against OpenCV's built-in
+* equivalents.
+*
+* Author: Dakshesh Pasala, Nickaan Jahadi
+*
+* Revisions:
+*
+************************************************************/
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
 
+/*-----------------------------------------------------
+* Function: grayscale
+*
+* Description: Converts a BGR frame to grayscale using
+* floating-point BT.709 luma coefficients, accessed via
+* row pointers for speed.
+*
+* param frame: cv::Mat: input BGR frame
+*
+* return: cv::Mat: single-channel (CV_8UC1) grayscale image
+*-----------------------------------------------------*/
 cv::Mat grayscale(cv::Mat frame) {
     int m = frame.rows;
     int n = frame.cols;
 
-    cv::Mat newImage(m, n, CV_8UC1);
+    cv::Mat newImage(m, n, CV_8UC1); // 8-bit unsigned and C1 = 1 channel (grayscale)
 
     for (int i = 0; i < m; i++) {
         cv::Vec3b* row = frame.ptr<cv::Vec3b>(i);
@@ -21,26 +45,44 @@ cv::Mat grayscale(cv::Mat frame) {
             unsigned char red = pixel[2];
 
             newRow[j] = cv::saturate_cast<unsigned char>(0.2126 * red + 0.7152 * green + 0.0722 * blue);
+            // unsigned char will round to nearest integer, clamp anything below 0 to 0, and clamp anything above 255 to 255
+            // necessary to average the values and ensure we are not out of the color pixel range
         }
     }
 
     return newImage;
 }
 
+/*-----------------------------------------------------
+* Function: sobel
+*
+* Description: Computes Sobel edge magnitude using the
+* exact Euclidean formula (sqrt(Gx^2 + Gy^2)) from a
+* grayscale frame, accessed via row pointers for speed.
+*
+* param frame: cv::Mat: single-channel grayscale input
+*
+* return: cv::Mat: single-channel Sobel edge magnitude
+* image (2 rows/cols smaller than input)
+*-----------------------------------------------------*/
 cv::Mat sobel(cv::Mat frame) {
     int m = frame.rows;
     int n = frame.cols;
 
     cv::Mat newImage(m - 2, n - 2, CV_8UC1, cv::Scalar(0));
 
+    // issue was everytime we did frame.at<uchar>(i, j) openCV has to recompute data + i * step + j * elementSize,
+    // then run a runtime check that T actually matches the Mat's real type
+    // and then returns a reference to the byte
+
     for (int i = 1; i < m - 1; i++) {
-        uchar* topRow    = frame.ptr<uchar>(i - 1);
+        uchar* topRow    = frame.ptr<uchar>(i - 1); // this will just compute it once per row, then it's just array indexing
         uchar* middleRow = frame.ptr<uchar>(i);
         uchar* bottomRow = frame.ptr<uchar>(i + 1);
         uchar* newRow    = newImage.ptr<uchar>(i - 1);
 
         for (int j = 1; j < n - 1; j++) {
-            int topLeft     = topRow[j - 1];
+            int topLeft     = topRow[j - 1]; // plain pointer arithmetic
             int topMiddle   = topRow[j];
             int topRight    = topRow[j + 1];
 
@@ -63,6 +105,15 @@ cv::Mat sobel(cv::Mat frame) {
     return newImage;
 }
 
+/*-----------------------------------------------------
+* Function: main
+*
+* Description: Opens the video, runs manual vs OpenCV
+* grayscale and Sobel timing comparisons per frame, then
+* prints the averages.
+*
+* return: int: 0 on success, 1 if the video failed to open
+*-----------------------------------------------------*/
 int main() {
     cv::VideoCapture video("video.mp4");
 
